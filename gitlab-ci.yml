@@ -1,0 +1,29 @@
+stages:
+  - build-and-push
+  # - config-helm
+  - deploy
+
+build-and-push:  
+  stage: build-and-push
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${REGISTRY_DESTINATION}\":{\"auth\":\"$(printf "%s:%s" "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor 
+      --context "$CI_PROJECT_DIR" 
+      --dockerfile "$CI_PROJECT_DIR/Dockerfile" 
+      --destination "$IMAGE_DESTINATION/${CI_PROJECT_NAME}:${CI_COMMIT_SHORT_SHA}"
+
+# config-helm:
+#  stage: config-helm
+#  image: 
+
+deploy:
+  stage: deploy
+  image: alpine/helm:3.2.1
+  script:
+    - git clone https://aandreev:Qazwsx_12345@neogit.neoflex.ru/DevOps/msa-platform/bootcamp-andreev-helm.git
+    - helm upgrade ${APP_NAME} /bootcamp-andreev-helm --install --values=test-helm-chart/values.yaml --namespace default --set name=${CI_PROJECT_NAME} --set image.tag=${CI_COMMIT_SHORT_SHA}
+
