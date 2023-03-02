@@ -1,0 +1,29 @@
+stages:
+  - build-and-push
+  - deploy-to-argocd
+  
+build-and-push:  
+  stage: build-and-push
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${REGISTRY_DESTINATION}\":{\"auth\":\"$(printf "%s:%s" "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor 
+      --context "${CI_PROJECT_DIR}" 
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile" 
+      --destination "${IMAGE_DESTINATION}/${CI_PROJECT_NAME}:${CI_COMMIT_SHORT_SHA}"
+
+
+deploy-to-argocd:
+  stage: deploy-to-argocd
+  image: 
+    name: argoproj/argocd:v2.4.11
+    entrypoint: [""]
+  script:
+    - argocd login "${ARGOCD_SERVER}" --username="${ARGOCD_LOGIN}" --password="${ARGOCD_PASS}" --insecure=true
+    # - argocd repo add "${HELM_CHART_GIT}" --username "${HELM_GIT_LOGIN}"  --password "${HELM_GIT_PASS}"
+    #- argocd app create test --repo "${HELM_CHART_GIT}" --path "${HELM_APP_DES}" --dest-namespace default --dest-server "${KUBE_SERVER}"
+    - argocd app set test -p image.tag="${CI_COMMIT_SHORT_SHA}"
+    - argocd app sync test
